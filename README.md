@@ -16,4 +16,5 @@ Sinta-se a vontade para contribuir com algo, ou comentar em algum ponto que acre
 ## Estudos com R
 
 1. [Previsão de Despesas Hospitalares](https://github.com/JairOliveira2014/DataScience_Estudos/tree/master/PrevisaoDespesasHospitalaresR): Neste diretório armazeno o *script* em R utlizado para criação de um modelo simples de regressão linear para previsão de despesas hospitalares. Este é o meu primeiro estudo utilizando a linguagem R.
+
 2. [Previsão de Ocorrência de Câncer](https://github.com/JairOliveira2014/DataScience_Estudos/tree/master/PrevendoOcorrenciaCancer): Neste *Script* em liguagem R tenho a solução simples para um problema de classificação à qual testei três modelos: KNN, SVM e Random Forest. Este é mais um passo no aprendizado de *Data Science* utilizando essa liguagem estatística.
