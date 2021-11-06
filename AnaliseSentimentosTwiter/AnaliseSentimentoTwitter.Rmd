@@ -1,0 +1,244 @@
+---
+title: "Análise de Sentimento de Twitters"
+author: "Jair Oliveira"
+date: "11/6/2021"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Análise de Sentimentos de Twitters
+
+Neste pequeno projeto iremos coletar dados da rede social Twitter, e assim realizar a análise de sentimento utilizando o algoritmo Naive Bayes. 
+Este é um tema à qual tem crescido de forma acelerada, pois, muitas organizações tem requisitado por tais análises em relação à produtos, marcas e até lançamento de novos produtos.
+
+O objetivo é realizar uma análise e conhecer o processo de classificação de sentimento, posteriormente realizar novos projetos com níveis de feature engineering mais aplicados nos textos.
+
+
+```{r pacotes}
+# install.packages("twitteR")
+# install.packages("httr")
+# install.packages("knitr")
+# install.packages("rmarkdown")
+library(twitteR)
+library(httr)
+library(knitr)
+library(rmarkdown)
+
+# Utilizando o script auxiliar para armazenar as variáveis aux.
+source("utils_2.R")
+
+```
+
+## Etapa 1 - Autenticação
+
+Deve-se criar uma conta desenvolvedor no Twitter e solicitar as chaves de acesso à API, as minhas chaves estou guardando em um script auxiliar chamado utils_2. Caso possua suas chaves, substitua diretamente nos valores das variáveis.
+
+```{r autenticacao}
+# Criando autenticação no Twitter
+key <- key
+keysecret <- keysecret
+token <- token
+tokensecret <- tokensecret
+```
+
+## Etapa 2 - Conexão
+
+Aqui vamos testar a conexão e capturar os tweets. Como não utilizo o twitter vou usar o user da Data science Academy para testar a conexão e verificar a time line.
+Quanto maior sua amostra, mais precisa sua análise. Mas a coleta de dados pode levar tempo, dependendo da sua conexão com a internet. Vamos realizar a coleta de 1500 tweets, pois à medida que você aumenta a quantidade, vai exigir mais recursos do seu computador. Buscaremos tweets com referência a hashtag #BigData.
+
+```{r conexao}
+
+# Testando a conexão com a time line da Data Science Academy
+userTimeline("dsacademybr")
+
+# Capturando os tweets
+tema <- "BigData"
+qtd_tweets <- 1500
+lingua <- "en"
+tweetdata = searchTwitter(tema, n = qtd_tweets, lang = lingua)
+
+# Visualizando as primeiras linhas do objeto tweetdata
+head(tweetdata)
+```
+
+## Etapa 3 - Tratamento dos dados coletados através de text mining
+
+Aqui vamos instalar o pacote tm, para text mining. Vamos converter os tweets coletados em um objeto do tipo Corpus, que armazena dados e metadados e na sequência faremos alguns processo de limpeza, como remover pontuação, converter os dados para letras minúsculas e remover as stopwords (palavras comuns do idioma inglês, neste caso).
+
+
+```{r textmining}
+
+# Testando a conexão com a time line da Data Science Academy
+userTimeline("dsacademybr")
+
+# Capturando os tweets
+tema <- "BigData"
+qtd_tweets <- 1500
+lingua <- "en"
+tweetdata = searchTwitter(tema, n = qtd_tweets, lang = lingua)
+
+# Visualizando as primeiras linhas do objeto tweetdata
+head(tweetdata)
+
+# Instalando o pacote para Text Mining.
+#install.packages("tm")
+#install.packages("SnowballC")
+library(SnowballC)
+library(tm)
+options(warn=-1)
+
+# Obtendo o texto
+tweetlist = sapply(tweetdata, function(x) x$getText())
+
+# Removendo caracteres especiais
+tweetlist = gsub("(RT|via)((?:\\b\\W*@\\w+)+)", "", tweetlist)
+# Removendo @
+tweetlist = gsub("@\\w+", "", tweetlist)
+# Removendo pontuação
+tweetlist = gsub("[[:punct:]]", "", tweetlist)
+# Removendo digitos
+tweetlist = gsub("[[:digit:]]", "", tweetlist)
+# Removendo links html
+tweetlist = gsub("http\\w+", "", tweetlist)
+# Removendo espacos desnecessários
+tweetlist = gsub("[ \t]{2,}", "", tweetlist)
+tweetlist = gsub("^\\s+|\\s+$", "", tweetlist)
+
+# Covertendo para o objeto Corpus e realizando algumas transformações
+tweetcorpus <- Corpus(VectorSource(tweetlist))
+tweetcorpus <- tm_map(tweetcorpus, removePunctuation)
+tweetcorpus <- tm_map(tweetcorpus, content_transformer(tolower))
+
+# Removendo as stopWords
+tweetcorpus <- tm_map(tweetcorpus, function(x)removeWords(x, stopwords()))
+```
+
+## Etapa 4 - Wordcloud, associação entre as palavras e dendograma
+
+Vamos criar uma nuvem de palavras (wordcloud) para verificar a relação entre as palavras que ocorrem com mais frequência. Criamos uma tabela com a frequência das palavras e então geramos um dendograma, que mostra como as palavras se relaiconam e se associam ao tema principal (o termo BigData).
+
+```{r wordcloud}
+
+#install.packages("RColorBrewer")
+#install.packages("wordcloud")
+library(RColorBrewer)
+library(wordcloud)
+
+# Gerando uma nuvem palavras
+pal <- brewer.pal(8,"Dark2")
+
+wordcloud(tweetcorpus, 
+          min.freq = 2, 
+          scale = c(3,1), 
+          random.color = F, 
+          max.word = 80, 
+          random.order = F,
+          colors = pal)
+
+# Convertendo o objeto texto para o formato de matriz
+tweettdm <- TermDocumentMatrix(tweetcorpus)
+tweettdm
+
+# Encontrando as palavras que aparecem com mais frequência
+findFreqTerms(tweettdm, lowfreq = 11)
+
+# Buscando associações com o spark
+findAssocs(tweettdm, 'hadoop', 0.60)
+
+# Removendo termos esparsos (não utilizados frequentemente)
+tweet2tdm <- removeSparseTerms(tweettdm, sparse = 0.9)
+
+# Criando escala nos dados
+tweet2tdmscale <- scale(tweet2tdm)
+
+# Distance Matrix
+tweetdist <- dist(tweet2tdmscale, method = "euclidean")
+
+# Preparando o dendograma
+tweetfit <- hclust(tweetdist)
+
+# Criando o dendograma (verificando como as palavras se agrupam)
+plot(tweetfit)
+
+# Verificando os grupos
+cutree(tweetfit, k = 4)
+
+# Visualizando os grupos de palavras no dendograma
+rect.hclust(tweetfit, k = 3, border = "red")
+```
+
+## Etapa 5 - Usando Classificador Naive Bayes para análise de sentimento
+
+Aqui faremos a análise de sentimento usando o pacote sentiment. Este pacote foi descontinuado do CRAN, pois não será mais atualizado, mas ainda pode ser obtido através do link de archives do CRAN.
+
+```{r sentimento}
+# install.packages("/opt/DSA/Projetos/Projeto01/Rstem_0.4-1.tar.gz", repos = NULL, type = "source")
+# install.packages("/opt/DSA/Projetos/Projeto01/sentiment_0.2.tar.gz", repos = NULL, type = "source")
+# install.packages("ggplot2")
+library(Rstem)
+library(sentiment)
+library(ggplot2)
+
+# Antes de realizar a classificação teremos que colocar twitterlist em lower case
+
+# Criando função para tolower
+try.error = function(x)
+{
+  # Criando missing value
+  y = NA
+  try_error = tryCatch(tolower(x), error=function(e) e)
+  if (!inherits(try_error, "error"))
+    y = tolower(x)
+  return(y)
+}
+
+# Lower case
+tweetlist_l = sapply(tweetlist, try.error)
+
+# Removendo os NAs
+tweetlist_l = tweetlist_l[!is.na(tweetlist_l)]
+names(tweetlist_l) = NULL
+
+# Classificando emocao
+class_emo = classify_emotion(tweetlist_l, algorithm = "bayes", prior = 1.0)
+emotion = class_emo[,7]
+
+# Substituindo NA's por "Neutro"
+emotion[is.na(emotion)] = "Neutro"
+
+# Classificando polaridade
+class_pol = classify_polarity(tweetlist, algorithm = "bayes")
+polarity = class_pol[,4]
+
+# Gerando um dataframe com o resultado
+sent_df = data.frame(text = tweetlist_l, emotion = emotion,
+                     polarity = polarity, stringsAsFactors = FALSE)
+
+# Ordenando o dataframe
+sent_df = within(sent_df,
+                 emotion <- factor(emotion, levels = names(sort(table(emotion), 
+                                                                decreasing=TRUE))))
+
+
+# Emoções encontradas
+ggplot(sent_df, aes(x = emotion)) +
+  geom_bar(aes(y = ..count.., fill = emotion)) +
+  scale_fill_brewer(palette = "Dark2") +
+  labs(x = "Categorias", y = "Numero de Tweets") 
+
+# Polaridade
+ggplot(sent_df, aes(x=polarity)) +
+  geom_bar(aes(y=..count.., fill=polarity)) +
+  scale_fill_brewer(palette="RdGy") +
+  labs(x = "Categorias de Sentimento", y = "Numero de Tweets")
+
+```
+
+
+Como podemos observar, esse script apenas possui de forma simples o entendimento de um processo de análise de sentimento, há inúmeras técnicas de feature engineering para tratamento e vetorização de dados em textos à qual pode-se de deve-se realizar em um projeto mais robusto. No entanto, para contato inicial considero que o objetivo foi alcançado.
+
+## Fim 
+
